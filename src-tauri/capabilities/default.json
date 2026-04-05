@@ -1,0 +1,17 @@
+{
+  "identifier": "default",
+  "description": "Default capabilities for SNDWRKS HUD",
+  "windows": ["hud", "settings", "help"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:event:allow-listen",
+    "core:event:allow-emit",
+    "core:window:default",
+    "core:window:allow-set-size",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-get-all-windows",
+    "core:window:allow-show",
+    "core:window:allow-set-focus"
+  ]
+}

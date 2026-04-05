@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>sndwrks hud -- help</title>
+  <link rel="stylesheet" href="help.css">
+</head>
+<body>
+  <div class="help-container">
+    <h1>sndwrks hud</h1>
+
+    <nav class="toc">
+      <a href="#settings">Settings</a>
+      <a href="#osc-api">OSC API</a>
+      <a href="#colors">Colors</a>
+    </nav>
+
+    <!-- Settings Section -->
+    <section id="settings">
+      <h2>Settings</h2>
+
+      <dl>
+        <dt>OSC UDP Port</dt>
+        <dd>The UDP port the HUD listens on for incoming OSC messages. Default: <code>52100</code>. Range: 1024–65535.</dd>
+
+        <dt>OSC TCP Port</dt>
+        <dd>Reserved TCP port for future OSC-over-TCP support. Default: <code>52101</code>.</dd>
+
+        <dt>HUD Width / Height</dt>
+        <dd>Dimensions of the HUD display window in pixels. Default: <code>800 × 300</code>.</dd>
+
+        <dt>Default Text Color</dt>
+        <dd>The default color used for HUD text when no color is specified in an OSC message.</dd>
+
+        <dt>Default Background</dt>
+        <dd>The default background color of the HUD window.</dd>
+
+        <dt>Always on Top</dt>
+        <dd>When enabled, the HUD window stays above all other windows.</dd>
+
+        <dt>Auto-fit Font Size</dt>
+        <dd>Automatically scales text to fill the HUD window. When enabled, the fixed font size setting is hidden.</dd>
+
+        <dt>Fixed Font Size</dt>
+        <dd>A fixed font size in pixels, used when auto-fit is disabled. Default: <code>72</code>. Range: 8–500.</dd>
+      </dl>
+    </section>
+
+    <!-- OSC API Section -->
+    <section id="osc-api">
+      <h2>OSC API</h2>
+      <p>Send OSC messages over UDP to control the HUD. All addresses are prefixed with <code>/sndwrks/hud</code>.</p>
+
+      <div class="osc-route">
+        <h3>/sndwrks/hud/message/single</h3>
+        <p>Display a single message on the HUD.</p>
+        <table>
+          <tr><th>Arg</th><th>Type</th><th>Description</th></tr>
+          <tr><td>1</td><td>string</td><td>Message text</td></tr>
+          <tr><td>2</td><td>string</td><td>Color name or hex (optional)</td></tr>
+        </table>
+        <pre>/sndwrks/hud/message/single "Hello World"
+/sndwrks/hud/message/single "Hello" "red"</pre>
+      </div>
+
+      <div class="osc-route">
+        <h3>/sndwrks/hud/message/lines</h3>
+        <p>Display multiple lines. If the last argument is a valid color, it is used as the text color.</p>
+        <table>
+          <tr><th>Arg</th><th>Type</th><th>Description</th></tr>
+          <tr><td>1…N</td><td>string</td><td>Message lines</td></tr>
+          <tr><td>last</td><td>string</td><td>Color name or hex (optional — only used if it is a valid color)</td></tr>
+        </table>
+        <pre>/sndwrks/hud/message/lines "Line 1" "Line 2" "Line 3"
+/sndwrks/hud/message/lines "Line 1" "Line 2" "blue"</pre>
+      </div>
+
+      <div class="osc-route">
+        <h3>/sndwrks/hud/message/flash</h3>
+        <p>Flash a message for a given duration, then fade back to the default background.</p>
+        <table>
+          <tr><th>Arg</th><th>Type</th><th>Description</th></tr>
+          <tr><td>1</td><td>string</td><td>Message text</td></tr>
+          <tr><td>2</td><td>float</td><td>Duration in seconds</td></tr>
+          <tr><td>3</td><td>string</td><td>Color name or hex (optional)</td></tr>
+        </table>
+        <pre>/sndwrks/hud/message/flash "STANDBY" 2.0
+/sndwrks/hud/message/flash "GO" 1.5 "green"</pre>
+      </div>
+
+      <div class="osc-route">
+        <h3>/sndwrks/hud/clear</h3>
+        <p>Clear the HUD display.</p>
+        <pre>/sndwrks/hud/clear</pre>
+      </div>
+
+      <div class="osc-route">
+        <h3>/sndwrks/hud/color</h3>
+        <p>Set the persistent text color (overrides the default until changed).</p>
+        <table>
+          <tr><th>Arg</th><th>Type</th><th>Description</th></tr>
+          <tr><td>1</td><td>string</td><td>Color name or hex</td></tr>
+        </table>
+        <pre>/sndwrks/hud/color "yellow"
+/sndwrks/hud/color "#ff6b6b"</pre>
+      </div>
+
+      <div class="osc-route">
+        <h3>/sndwrks/hud/background</h3>
+        <p>Set the background color.</p>
+        <table>
+          <tr><th>Arg</th><th>Type</th><th>Description</th></tr>
+          <tr><td>1</td><td>string</td><td>Color name or hex</td></tr>
+        </table>
+        <pre>/sndwrks/hud/background "#1a1a2e"</pre>
+      </div>
+
+      <div class="osc-route">
+        <h3>/sndwrks/hud/fontsize</h3>
+        <p>Override the font size. Send <code>0</code> to return to auto-fit mode.</p>
+        <table>
+          <tr><th>Arg</th><th>Type</th><th>Description</th></tr>
+          <tr><td>1</td><td>int</td><td>Font size in pixels (0 = auto)</td></tr>
+        </table>
+        <pre>/sndwrks/hud/fontsize 48
+/sndwrks/hud/fontsize 0</pre>
+      </div>
+    </section>
+
+    <!-- Colors Section -->
+    <section id="colors">
+      <h2>Colors</h2>
+      <p>Use these named colors in any OSC message that accepts a color argument. Custom hex values (<code>#RGB</code> or <code>#RRGGBB</code>) are also supported.</p>
+
+      <div class="color-grid">
+        <div class="color-item">
+          <span class="color-swatch" style="background: #ff6b6b;"></span>
+          <span class="color-name">red</span>
+          <span class="color-hex">#ff6b6b</span>
+        </div>
+        <div class="color-item">
+          <span class="color-swatch" style="background: #69db7c;"></span>
+          <span class="color-name">green</span>
+          <span class="color-hex">#69db7c</span>
+        </div>
+        <div class="color-item">
+          <span class="color-swatch" style="background: #74c0fc;"></span>
+          <span class="color-name">blue</span>
+          <span class="color-hex">#74c0fc</span>
+        </div>
+        <div class="color-item">
+          <span class="color-swatch" style="background: #ffe066;"></span>
+          <span class="color-name">yellow</span>
+          <span class="color-hex">#ffe066</span>
+        </div>
+        <div class="color-item">
+          <span class="color-swatch" style="background: #63e6be;"></span>
+          <span class="color-name">teal</span>
+          <span class="color-hex">#63e6be</span>
+        </div>
+        <div class="color-item">
+          <span class="color-swatch" style="background: #ffa94d;"></span>
+          <span class="color-name">orange</span>
+          <span class="color-hex">#ffa94d</span>
+        </div>
+        <div class="color-item">
+          <span class="color-swatch" style="background: #b197fc;"></span>
+          <span class="color-name">purple</span>
+          <span class="color-hex">#b197fc</span>
+        </div>
+        <div class="color-item">
+          <span class="color-swatch" style="background: #f783ac;"></span>
+          <span class="color-name">pink</span>
+          <span class="color-hex">#f783ac</span>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

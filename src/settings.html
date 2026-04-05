@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>sndwrks hud -- settings</title>
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <div class="settings-container">
+    <h1>sndwrks hud settings <span id="app-version"></span></h1>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="udp-port">OSC UDP Port</label>
+        <input type="number" id="udp-port" min="1024" max="65535" value="52100">
+      </div>
+      <div class="form-group">
+        <label for="tcp-port">OSC TCP Port</label>
+        <input type="number" id="tcp-port" min="1024" max="65535" value="52101">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="hud-width">HUD Width (px)</label>
+        <input type="number" id="hud-width" min="200" max="3840" value="800">
+      </div>
+      <div class="form-group">
+        <label for="hud-height">HUD Height (px)</label>
+        <input type="number" id="hud-height" min="100" max="2160" value="300">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Default Text Color</label>
+      <div class="color-select" id="text-color">
+        <button class="color-select-trigger" type="button">
+          <span class="color-select-swatch"></span>
+          <span class="color-select-label"></span>
+          <svg class="color-select-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="color-select-content">
+          <div class="color-select-item" data-value="white"><span class="color-select-item-swatch" style="background:#ffffff"></span>White<svg class="color-select-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+          <div class="color-select-item" data-value="red"><span class="color-select-item-swatch" style="background:#ff6b6b"></span>Red<svg class="color-select-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+          <div class="color-select-item" data-value="green"><span class="color-select-item-swatch" style="background:#69db7c"></span>Green<svg class="color-select-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+          <div class="color-select-item" data-value="blue"><span class="color-select-item-swatch" style="background:#74c0fc"></span>Blue<svg class="color-select-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+          <div class="color-select-item" data-value="yellow"><span class="color-select-item-swatch" style="background:#ffe066"></span>Yellow<svg class="color-select-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+          <div class="color-select-item" data-value="teal"><span class="color-select-item-swatch" style="background:#63e6be"></span>Teal<svg class="color-select-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+          <div class="color-select-item" data-value="orange"><span class="color-select-item-swatch" style="background:#ffa94d"></span>Orange<svg class="color-select-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+          <div class="color-select-item" data-value="purple"><span class="color-select-item-swatch" style="background:#b197fc"></span>Purple<svg class="color-select-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+          <div class="color-select-item" data-value="pink"><span class="color-select-item-swatch" style="background:#f783ac"></span>Pink<svg class="color-select-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="checkbox-label">
+        <input type="checkbox" id="always-on-top" checked>
+        Always on Top
+      </label>
+    </div>
+
+    <div class="form-group">
+      <label class="checkbox-label">
+        <input type="checkbox" id="auto-fit" checked>
+        Auto-fit Font Size
+      </label>
+    </div>
+
+    <div class="form-group" id="fixed-font-group">
+      <label for="fixed-font-size">Fixed Font Size (px)</label>
+      <input type="number" id="fixed-font-size" min="8" max="500" value="72">
+    </div>
+
+    <div class="button-row">
+      <button id="save-btn">Save Settings</button>
+      <button id="help-btn" class="btn-secondary">Help</button>
+    </div>
+
+    <div id="status" class="status"></div>
+  </div>
+
+  <script src="settings.js" type="module"></script>
+</body>
+</html>

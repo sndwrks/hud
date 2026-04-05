@@ -1,0 +1,51 @@
+{
+  "productName": "sndwrks hud",
+  "version": "0.1.0",
+  "identifier": "com.sndwrks.hud",
+  "build": {
+    "frontendDist": "../src",
+    "beforeDevCommand": "",
+    "beforeBuildCommand": ""
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "hud",
+        "title": "sndwrks hud",
+        "url": "hud.html",
+        "width": 800,
+        "height": 300,
+        "decorations": true,
+        "alwaysOnTop": false,
+        "resizable": true,
+        "transparent": false,
+        "focus": true
+      },
+      {
+        "label": "settings",
+        "title": "sndwrks hud -- settings",
+        "url": "settings.html",
+        "width": 500,
+        "height": 650,
+        "decorations": true,
+        "alwaysOnTop": false,
+        "resizable": true,
+        "visible": false,
+        "focus": false
+      },
+      {
+        "label": "help",
+        "title": "sndwrks hud -- help",
+        "url": "help.html",
+        "width": 650,
+        "height": 700,
+        "decorations": true,
+        "alwaysOnTop": false,
+        "resizable": true,
+        "visible": false,
+        "focus": false
+      }
+    ]
+  }
+}
