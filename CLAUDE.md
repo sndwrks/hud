@@ -75,6 +75,12 @@ Settings saved as JSON to `~/.config/sndwrks-hud/settings.json` (resolved via `d
 3. Add field ref in `settings.js` `fields` object
 4. Wire save/load logic in `settings.js`
 
+## Git Conventions
+
+- Branch naming: `main.<feature-name>`
+- Never commit directly to `main`
+- No Claude branding or attribution in commits, PRs, or code
+
 ## Key Dependencies
 
 - **tauri 2** — app framework, IPC, window management
