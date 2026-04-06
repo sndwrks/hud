@@ -2,6 +2,14 @@
   "productName": "sndwrks hud",
   "version": "0.1.0",
   "identifier": "com.sndwrks.hud",
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon.png",
+      "icons/icon.ico"
+    ]
+  },
   "build": {
     "frontendDist": "../src",
     "beforeDevCommand": "",
