@@ -1,7 +1,9 @@
+use crate::debug_log;
 use rosc::{OscMessage, OscPacket, OscType};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
-use tokio::net::UdpSocket;
+use tokio::io::AsyncReadExt;
+use tokio::net::{TcpListener, TcpStream, UdpSocket};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "type")]
@@ -170,7 +172,7 @@ pub async fn start_udp_listener(port: u16, app: AppHandle) {
     let addr = format!("0.0.0.0:{}", port);
     let socket = match UdpSocket::bind(&addr).await {
         Ok(s) => {
-            println!("OSC UDP listener started on port {}", port);
+            debug_log!("OSC UDP listener started on port {}", port);
             s
         }
         Err(e) => {
@@ -194,6 +196,117 @@ pub async fn start_udp_listener(port: u16, app: AppHandle) {
     }
 }
 
+pub async fn start_tcp_listener(port: u16, app: AppHandle) {
+    let addr = format!("0.0.0.0:{}", port);
+    let listener = match TcpListener::bind(&addr).await {
+        Ok(l) => {
+            debug_log!("[TCP] listening on port {}", port);
+            l
+        }
+        Err(e) => {
+            eprintln!("[TCP] failed to bind on {}: {}", addr, e);
+            return;
+        }
+    };
+
+    loop {
+        match listener.accept().await {
+            Ok((stream, peer)) => {
+                debug_log!("[TCP] connection from {}", peer);
+                let app = app.clone();
+                tokio::spawn(async move {
+                    handle_tcp_connection(stream, app, peer).await;
+                });
+            }
+            Err(e) => {
+                eprintln!("[TCP] accept error: {}", e);
+            }
+        }
+    }
+}
+
+const SLIP_END: u8 = 0xC0;
+const SLIP_ESC: u8 = 0xDB;
+const SLIP_ESC_END: u8 = 0xDC;
+const SLIP_ESC_ESC: u8 = 0xDD;
+
+/// Extract the first complete SLIP frame from `buf`.
+/// Returns `Some((bytes_consumed, unescaped_payload))` or `None` if no
+/// complete frame is available yet.
+fn slip_decode(buf: &[u8]) -> Option<(usize, Vec<u8>)> {
+    // Skip leading END bytes (double-END preamble / inter-frame padding).
+    let start = buf.iter().position(|&b| b != SLIP_END)?;
+    // Find the terminating END after the payload bytes.
+    let end_pos = buf[start..].iter().position(|&b| b == SLIP_END)?;
+    let frame = &buf[start..start + end_pos];
+
+    // Unescape the frame.
+    let mut out = Vec::with_capacity(frame.len());
+    let mut i = 0;
+    while i < frame.len() {
+        if frame[i] == SLIP_ESC {
+            i += 1;
+            if i >= frame.len() {
+                break;
+            }
+            match frame[i] {
+                SLIP_ESC_END => out.push(SLIP_END),
+                SLIP_ESC_ESC => out.push(SLIP_ESC),
+                other => out.push(other), // best-effort
+            }
+        } else {
+            out.push(frame[i]);
+        }
+        i += 1;
+    }
+
+    // Consumed = up to and including the terminating END byte.
+    let consumed = start + end_pos + 1;
+    Some((consumed, out))
+}
+
+async fn handle_tcp_connection(
+    mut stream: TcpStream,
+    app: AppHandle,
+    peer: std::net::SocketAddr,
+) {
+    let mut buf: Vec<u8> = Vec::with_capacity(4096);
+    let mut read_chunk = [0u8; 4096];
+
+    loop {
+        match stream.read(&mut read_chunk).await {
+            Ok(0) => {
+                debug_log!("[TCP] {} disconnected", peer);
+                return;
+            }
+            Ok(n) => {
+                buf.extend_from_slice(&read_chunk[..n]);
+
+                // Drain as many complete SLIP frames as the buffer contains.
+                while let Some((consumed, payload)) = slip_decode(&buf) {
+                    buf.drain(..consumed);
+                    if payload.is_empty() {
+                        continue;
+                    }
+                    match rosc::decoder::decode_udp(&payload) {
+                        Ok((_remainder, packet)) => {
+                            debug_log!("[TCP] packet from {}", peer);
+                            handle_packet(packet, &app);
+                        }
+                        Err(e) => {
+                            eprintln!("[TCP] decode error from {}: {:?}", peer, e);
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("[TCP] read error from {}: {}", peer, e);
+                return;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -203,6 +316,74 @@ mod tests {
         OscMessage {
             addr: addr.to_string(),
             args,
+        }
+    }
+
+    // ── SLIP framing ──
+
+    #[test]
+    fn slip_decode_single_frame() {
+        // Double-END SLIP: END payload END
+        let payload = b"hello";
+        let mut buf = vec![SLIP_END];
+        buf.extend_from_slice(payload);
+        buf.push(SLIP_END);
+
+        let (consumed, decoded) = slip_decode(&buf).unwrap();
+        assert_eq!(consumed, buf.len());
+        assert_eq!(decoded, b"hello");
+    }
+
+    #[test]
+    fn slip_decode_with_escapes() {
+        // Payload contains literal END (0xC0) and ESC (0xDB) bytes.
+        let mut buf = vec![SLIP_END];
+        buf.push(0x01);
+        buf.extend_from_slice(&[SLIP_ESC, SLIP_ESC_END]); // escaped 0xC0
+        buf.push(0x02);
+        buf.extend_from_slice(&[SLIP_ESC, SLIP_ESC_ESC]); // escaped 0xDB
+        buf.push(0x03);
+        buf.push(SLIP_END);
+
+        let (consumed, decoded) = slip_decode(&buf).unwrap();
+        assert_eq!(consumed, buf.len());
+        assert_eq!(decoded, vec![0x01, SLIP_END, 0x02, SLIP_ESC, 0x03]);
+    }
+
+    #[test]
+    fn slip_decode_incomplete() {
+        // No terminating END byte yet.
+        let buf = vec![SLIP_END, 0x01, 0x02, 0x03];
+        assert!(slip_decode(&buf).is_none());
+    }
+
+    #[test]
+    fn slip_decode_empty_between_ends() {
+        // Back-to-back ENDs with no payload bytes → None (all skipped as preamble).
+        let buf = vec![SLIP_END, SLIP_END];
+        assert!(slip_decode(&buf).is_none());
+    }
+
+    #[test]
+    fn slip_frame_to_osc_packet() {
+        let packet = OscPacket::Message(OscMessage {
+            addr: "/sndwrks/hud/clear".to_string(),
+            args: vec![],
+        });
+        let encoded = rosc::encoder::encode(&packet).unwrap();
+
+        // Wrap in double-END SLIP frame.
+        let mut framed = vec![SLIP_END];
+        framed.extend_from_slice(&encoded);
+        framed.push(SLIP_END);
+
+        let (consumed, payload) = slip_decode(&framed).unwrap();
+        assert_eq!(consumed, framed.len());
+        let (_rest, decoded) = rosc::decoder::decode_udp(&payload).unwrap();
+        if let OscPacket::Message(m) = decoded {
+            assert_eq!(m.addr, "/sndwrks/hud/clear");
+        } else {
+            panic!("expected OscMessage");
         }
     }
 
