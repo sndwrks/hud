@@ -1,7 +1,8 @@
 use rosc::{OscMessage, OscPacket, OscType};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
-use tokio::net::UdpSocket;
+use tokio::io::AsyncReadExt;
+use tokio::net::{TcpListener, TcpStream, UdpSocket};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "type")]
@@ -194,6 +195,79 @@ pub async fn start_udp_listener(port: u16, app: AppHandle) {
     }
 }
 
+pub async fn start_tcp_listener(port: u16, app: AppHandle) {
+    let addr = format!("0.0.0.0:{}", port);
+    let listener = match TcpListener::bind(&addr).await {
+        Ok(l) => {
+            println!("OSC TCP listener started on port {}", port);
+            l
+        }
+        Err(e) => {
+            eprintln!("Failed to bind TCP socket on {}: {}", addr, e);
+            return;
+        }
+    };
+
+    loop {
+        match listener.accept().await {
+            Ok((stream, peer)) => {
+                let app = app.clone();
+                tokio::spawn(async move {
+                    handle_tcp_connection(stream, app, peer).await;
+                });
+            }
+            Err(e) => {
+                eprintln!("TCP accept error: {}", e);
+            }
+        }
+    }
+}
+
+async fn handle_tcp_connection(
+    mut stream: TcpStream,
+    app: AppHandle,
+    peer: std::net::SocketAddr,
+) {
+    let mut buf: Vec<u8> = Vec::with_capacity(4096);
+    let mut read_chunk = [0u8; 4096];
+
+    loop {
+        match stream.read(&mut read_chunk).await {
+            Ok(0) => {
+                // Peer closed cleanly
+                return;
+            }
+            Ok(n) => {
+                buf.extend_from_slice(&read_chunk[..n]);
+
+                // Drain as many complete packets as the buffer contains.
+                loop {
+                    match rosc::decoder::decode_tcp(&buf) {
+                        Ok((remainder, Some(packet))) => {
+                            let consumed = buf.len() - remainder.len();
+                            handle_packet(packet, &app);
+                            buf.drain(..consumed);
+                        }
+                        Ok((_, None)) => {
+                            // Need more bytes — wait for next read.
+                            break;
+                        }
+                        Err(e) => {
+                            eprintln!("TCP decode error from {}: {}", peer, e);
+                            // Stream is out of sync; drop the connection.
+                            return;
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("TCP read error from {}: {}", peer, e);
+                return;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -204,6 +278,44 @@ mod tests {
             addr: addr.to_string(),
             args,
         }
+    }
+
+    // ── TCP framing ──
+
+    #[test]
+    fn decode_tcp_length_prefixed_frame() {
+        let packet = OscPacket::Message(OscMessage {
+            addr: "/sndwrks/hud/clear".to_string(),
+            args: vec![],
+        });
+        let encoded = rosc::encoder::encode(&packet).unwrap();
+        let mut framed = Vec::new();
+        framed.extend_from_slice(&(encoded.len() as u32).to_be_bytes());
+        framed.extend_from_slice(&encoded);
+
+        let (remainder, decoded) = rosc::decoder::decode_tcp(&framed).unwrap();
+        assert!(remainder.is_empty());
+        let pkt = decoded.expect("should have decoded a full packet");
+        if let OscPacket::Message(m) = pkt {
+            assert_eq!(m.addr, "/sndwrks/hud/clear");
+        } else {
+            panic!("expected OscMessage");
+        }
+    }
+
+    #[test]
+    fn decode_tcp_partial_frame_returns_none() {
+        let packet = OscPacket::Message(OscMessage {
+            addr: "/sndwrks/hud/clear".to_string(),
+            args: vec![],
+        });
+        let encoded = rosc::encoder::encode(&packet).unwrap();
+        let mut framed = Vec::new();
+        framed.extend_from_slice(&(encoded.len() as u32).to_be_bytes());
+        framed.extend_from_slice(&encoded[..encoded.len() / 2]);
+
+        let (_, decoded) = rosc::decoder::decode_tcp(&framed).unwrap();
+        assert!(decoded.is_none());
     }
 
     // ── is_color ──

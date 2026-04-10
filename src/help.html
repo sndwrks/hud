@@ -25,7 +25,7 @@
         <dd>The UDP port the HUD listens on for incoming OSC messages. Default: <code>52100</code>. Range: 1024–65535.</dd>
 
         <dt>OSC TCP Port</dt>
-        <dd>Reserved TCP port for future OSC-over-TCP support. Default: <code>52101</code>.</dd>
+        <dd>The TCP port the HUD listens on for incoming OSC messages. Default: <code>52101</code>. Range: 1024–65535. Uses standard OSC 1.0 length-prefix framing (4-byte big-endian size + packet), compatible with QLab, TouchDesigner, Companion, and other OSC-over-TCP clients.</dd>
 
         <dt>HUD Width / Height</dt>
         <dd>Dimensions of the HUD display window in pixels. Default: <code>800 × 300</code>.</dd>
@@ -50,7 +50,7 @@
     <!-- OSC API Section -->
     <section id="osc-api">
       <h2>OSC API</h2>
-      <p>Send OSC messages over UDP to control the HUD. All addresses are prefixed with <code>/sndwrks/hud</code>.</p>
+      <p>Send OSC messages over UDP or TCP to control the HUD. All addresses are prefixed with <code>/sndwrks/hud</code>.</p>
 
       <div class="osc-route">
         <h3>/sndwrks/hud/message/single</h3>

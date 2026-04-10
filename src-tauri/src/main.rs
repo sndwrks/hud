@@ -11,8 +11,10 @@ use tauri::Manager;
 use tokio::sync::watch;
 
 struct OscState {
-    /// Send a new port value to restart the listener
-    port_tx: watch::Sender<u16>,
+    /// Send a new port value to restart the UDP listener
+    udp_port_tx: watch::Sender<u16>,
+    /// Send a new port value to restart the TCP listener
+    tcp_port_tx: watch::Sender<u16>,
 }
 
 #[tauri::command]
@@ -20,20 +22,37 @@ fn restart_osc(
     osc_state: tauri::State<'_, OscState>,
     config: tauri::State<'_, AppConfig>,
 ) -> Result<(), String> {
-    let port = config.settings.lock().map_err(|e| e.to_string())?.udp_port;
-    osc_state.port_tx.send(port).map_err(|e| e.to_string())?;
+    let (udp_port, tcp_port) = {
+        let s = config.settings.lock().map_err(|e| e.to_string())?;
+        (s.udp_port, s.tcp_port)
+    };
+    osc_state
+        .udp_port_tx
+        .send(udp_port)
+        .map_err(|e| e.to_string())?;
+    osc_state
+        .tcp_port_tx
+        .send(tcp_port)
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
 fn main() {
     let app_config = AppConfig::new();
-    let initial_port = app_config.settings.lock().unwrap().udp_port;
+    let (initial_udp_port, initial_tcp_port) = {
+        let s = app_config.settings.lock().unwrap();
+        (s.udp_port, s.tcp_port)
+    };
 
-    let (port_tx, port_rx) = watch::channel(initial_port);
+    let (udp_port_tx, udp_port_rx) = watch::channel(initial_udp_port);
+    let (tcp_port_tx, tcp_port_rx) = watch::channel(initial_tcp_port);
 
     tauri::Builder::default()
         .manage(app_config)
-        .manage(OscState { port_tx })
+        .manage(OscState {
+            udp_port_tx,
+            tcp_port_tx,
+        })
         .invoke_handler(tauri::generate_handler![
             commands::get_settings,
             commands::save_settings,
@@ -100,16 +119,29 @@ fn main() {
                 if let (Some(x), Some(y)) = (settings.hud_x, settings.hud_y) {
                     let _ = hud_window.set_position(tauri::PhysicalPosition::new(x, y));
                 }
+                let _ = hud_window.set_size(tauri::PhysicalSize::new(settings.hud_width, settings.hud_height));
+                let _ = hud_window.set_always_on_top(settings.always_on_top);
 
                 let app_handle_for_move = app.handle().clone();
                 hud_window.on_window_event(move |event| {
-                    if let tauri::WindowEvent::Moved(position) = event {
-                        let config = app_handle_for_move.state::<AppConfig>();
-                        if let Ok(mut s) = config.settings.lock() {
-                            s.hud_x = Some(position.x);
-                            s.hud_y = Some(position.y);
+                    match event {
+                        tauri::WindowEvent::Moved(position) => {
+                            let config = app_handle_for_move.state::<AppConfig>();
+                            if let Ok(mut s) = config.settings.lock() {
+                                s.hud_x = Some(position.x);
+                                s.hud_y = Some(position.y);
+                            }
+                            let _ = config.save();
                         }
-                        let _ = config.save();
+                        tauri::WindowEvent::Resized(size) => {
+                            let config = app_handle_for_move.state::<AppConfig>();
+                            if let Ok(mut s) = config.settings.lock() {
+                                s.hud_width = size.width;
+                                s.hud_height = size.height;
+                            }
+                            let _ = config.save();
+                        }
+                        _ => {}
                     }
                 });
             }
@@ -124,21 +156,39 @@ fn main() {
                 }
             });
 
-            let app_handle = app.handle().clone();
-            let mut port_rx = port_rx;
+            let app_handle_udp = app.handle().clone();
+            let mut udp_port_rx = udp_port_rx;
 
             tauri::async_runtime::spawn(async move {
                 loop {
-                    let port = *port_rx.borrow_and_update();
+                    let port = *udp_port_rx.borrow_and_update();
                     println!("Starting OSC UDP listener on port {}", port);
 
                     tokio::select! {
-                        _ = osc::start_udp_listener(port, app_handle.clone()) => {
-                            // Listener exited unexpectedly, will restart on next port change
-                            eprintln!("OSC listener exited unexpectedly");
+                        _ = osc::start_udp_listener(port, app_handle_udp.clone()) => {
+                            eprintln!("OSC UDP listener exited unexpectedly");
                         }
-                        _ = port_rx.changed() => {
-                            println!("Port changed, restarting OSC listener...");
+                        _ = udp_port_rx.changed() => {
+                            println!("UDP port changed, restarting OSC UDP listener...");
+                        }
+                    }
+                }
+            });
+
+            let app_handle_tcp = app.handle().clone();
+            let mut tcp_port_rx = tcp_port_rx;
+
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    let port = *tcp_port_rx.borrow_and_update();
+                    println!("Starting OSC TCP listener on port {}", port);
+
+                    tokio::select! {
+                        _ = osc::start_tcp_listener(port, app_handle_tcp.clone()) => {
+                            eprintln!("OSC TCP listener exited unexpectedly");
+                        }
+                        _ = tcp_port_rx.changed() => {
+                            println!("TCP port changed, restarting OSC TCP listener...");
                         }
                     }
                 }
