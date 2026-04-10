@@ -5,6 +5,15 @@ mod commands;
 mod config;
 mod osc;
 
+macro_rules! debug_log {
+    ($($arg:tt)*) => {
+        #[cfg(debug_assertions)]
+        println!($($arg)*);
+    };
+}
+
+pub(crate) use debug_log;
+
 use config::AppConfig;
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::Manager;
@@ -162,14 +171,14 @@ fn main() {
             tauri::async_runtime::spawn(async move {
                 loop {
                     let port = *udp_port_rx.borrow_and_update();
-                    println!("Starting OSC UDP listener on port {}", port);
+                    debug_log!("Starting OSC UDP listener on port {}", port);
 
                     tokio::select! {
                         _ = osc::start_udp_listener(port, app_handle_udp.clone()) => {
                             eprintln!("OSC UDP listener exited unexpectedly");
                         }
                         _ = udp_port_rx.changed() => {
-                            println!("UDP port changed, restarting OSC UDP listener...");
+                            debug_log!("UDP port changed, restarting OSC UDP listener...");
                         }
                     }
                 }
@@ -181,14 +190,14 @@ fn main() {
             tauri::async_runtime::spawn(async move {
                 loop {
                     let port = *tcp_port_rx.borrow_and_update();
-                    println!("Starting OSC TCP listener on port {}", port);
+                    debug_log!("Starting OSC TCP listener on port {}", port);
 
                     tokio::select! {
                         _ = osc::start_tcp_listener(port, app_handle_tcp.clone()) => {
                             eprintln!("OSC TCP listener exited unexpectedly");
                         }
                         _ = tcp_port_rx.changed() => {
-                            println!("TCP port changed, restarting OSC TCP listener...");
+                            debug_log!("TCP port changed, restarting OSC TCP listener...");
                         }
                     }
                 }
