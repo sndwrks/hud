@@ -99,6 +99,11 @@ fn main() {
             let window_menu = SubmenuBuilder::new(handle, "Window")
                 .minimize()
                 .separator()
+                .item(
+                    &MenuItemBuilder::with_id("show_hud", "Show HUD")
+                        .build(handle)?,
+                )
+                .separator()
                 .close_window()
                 .build()?;
 
@@ -132,8 +137,13 @@ fn main() {
                 let _ = hud_window.set_always_on_top(settings.always_on_top);
 
                 let app_handle_for_move = app.handle().clone();
+                let win_for_close = hud_window.clone();
                 hud_window.on_window_event(move |event| {
                     match event {
+                        tauri::WindowEvent::CloseRequested { api, .. } => {
+                            api.prevent_close();
+                            let _ = win_for_close.hide();
+                        }
                         tauri::WindowEvent::Moved(position) => {
                             let config = app_handle_for_move.state::<AppConfig>();
                             if let Ok(mut s) = config.settings.lock() {
@@ -157,11 +167,20 @@ fn main() {
 
             // Handle menu events
             app.on_menu_event(move |app_handle, event| {
-                if event.id().as_ref() == "settings" {
-                    if let Some(window) = app_handle.get_webview_window("settings") {
-                        let _ = window.show();
-                        let _ = window.set_focus();
+                match event.id().as_ref() {
+                    "settings" => {
+                        if let Some(window) = app_handle.get_webview_window("settings") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
                     }
+                    "show_hud" => {
+                        if let Some(window) = app_handle.get_webview_window("hud") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    _ => {}
                 }
             });
 
@@ -205,6 +224,15 @@ fn main() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app_handle, _event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = _event {
+                if let Some(window) = _app_handle.get_webview_window("hud") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+        });
 }
